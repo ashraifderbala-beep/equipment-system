@@ -1257,14 +1257,12 @@ window.addEventListener("load", function () {
 
                 try {
 
-                    // ✅ تحديد جدول القراءات الصحيح
-                    const tables = document.querySelectorAll("table");
                     let targetTable = null;
 
-                    tables.forEach(t => {
-                        if (t.innerText.includes("القراءة السابقة") &&
-                            t.innerText.includes("القراءة الحالية")) {
-                            targetTable = t;
+                    // ✅ نبحث عن جدول "آخر القراءات المسجلة"
+                    document.querySelectorAll("div").forEach(div => {
+                        if (div.innerText.includes("آخر القراءات المسجلة")) {
+                            targetTable = div.querySelector("table");
                         }
                     });
 
@@ -1273,7 +1271,6 @@ window.addEventListener("load", function () {
                         return;
                     }
 
-                    // ✅ أخذ آخر صف
                     const rows = targetTable.querySelectorAll("tbody tr");
 
                     if (rows.length === 0) {
@@ -1281,10 +1278,10 @@ window.addEventListener("load", function () {
                         return;
                     }
 
+                    // ✅ آخر صف فقط
                     const lastRow = rows[rows.length - 1];
                     const c = lastRow.querySelectorAll("td");
 
-                    // ✅ تجهيز البيانات للإرسال
                     const payload = {
                         date: c[0]?.innerText.trim() || "",
                         code: c[1]?.innerText.trim() || "",
@@ -1295,14 +1292,13 @@ window.addEventListener("load", function () {
                         current: c[6]?.innerText.trim() || 0,
                         net: c[7]?.innerText.trim() || 0,
                         operator: c[8]?.innerText.trim() || "",
-                        notes: c[9]?.innerText.trim() || "",
+                        notes: "",
                         transferType: "",
                         transferTo: ""
                     };
 
-                    console.log("📤 Sending:", payload);
+                    console.log("📤 إرسال:", payload);
 
-                    // ✅ إرسال البيانات (مهم جدًا headers)
                     fetch(API, {
                         method: "POST",
                         headers: {
@@ -1311,7 +1307,7 @@ window.addEventListener("load", function () {
                         body: JSON.stringify(payload)
                     });
 
-                    alert("✅ تم إرسال البيانات إلى Google Sheets");
+                    alert("✅ تم الإرسال بنجاح إلى Google Sheets");
 
                 } catch (err) {
                     console.error(err);
@@ -1325,6 +1321,8 @@ window.addEventListener("load", function () {
     });
 
 });
+
+</script>
 
 </script>
 ``
