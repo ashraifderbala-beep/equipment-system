@@ -1243,5 +1243,90 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 </script>
+  <script>
+
+window.addEventListener("load", function () {
+
+    const API = "https://script.google.com/macros/s/AKfycbz9-lsqZf7F9NZSryJ_2xBRK86eLZqkO14Y-aUD5EoIHS3cMLcyDuwWiG8RmMxqYH5N/exec";
+
+    const buttons = document.querySelectorAll("button");
+
+    buttons.forEach(btn => {
+
+        if (btn.innerText.includes("حفظ")) {
+
+            btn.addEventListener("click", function () {
+
+                try {
+
+                    // ✅ نحدد جدول "آخر القراءات"
+                    const tables = document.querySelectorAll("table");
+
+                    let targetTable = null;
+
+                    tables.forEach(t => {
+                        if (t.innerText.includes("القراءة السابقة") &&
+                            t.innerText.includes("القراءة الحالية")) {
+                            targetTable = t;
+                        }
+                    });
+
+                    if (!targetTable) {
+                        alert("❌ لم يتم العثور على جدول القراءات");
+                        return;
+                    }
+
+                    const rows = targetTable.querySelectorAll("tbody tr");
+
+                    if (rows.length === 0) {
+                        alert("❌ لا يوجد بيانات");
+                        return;
+                    }
+
+                    // ✅ اخر صف (اخر قراءة)
+                    const lastRow = rows[rows.length - 1];
+                    const cells = lastRow.querySelectorAll("td");
+
+                    // ✅ بناء البيانات
+                    const payload = {
+                        date: cells[0]?.innerText.trim() || "",
+                        code: cells[1]?.innerText.trim() || "",
+                        name: cells[2]?.innerText.trim() || "",
+                        project: cells[3]?.innerText.trim() || "",
+                        status: cells[4]?.innerText.trim() || "",
+                        prev: cells[5]?.innerText.trim() || 0,
+                        current: cells[6]?.innerText.trim() || 0,
+                        net: cells[7]?.innerText.trim() || 0,
+                        operator: cells[8]?.innerText.trim() || "",
+                        notes: cells[9]?.innerText.trim() || "",
+
+                        // الأعمدة الإضافية
+                        transferType: "",
+                        transferTo: ""
+                    };
+
+                    console.log("📤 إرسال:", payload);
+
+                    fetch(API, {
+                        method: "POST",
+                        body: JSON.stringify(payload)
+                    });
+
+                    alert("✅ تم إرسال البيانات إلى النظام الرئيسي");
+
+                } catch (err) {
+                    console.error(err);
+                    alert("❌ حصل خطأ في القراءة");
+                }
+
+            });
+
+        }
+
+    });
+
+});
+
+</script>
 </body>
 </html>
