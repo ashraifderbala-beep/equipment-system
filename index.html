@@ -1243,6 +1243,7 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 </script>
+
 <script>
 
 window.addEventListener("load", function () {
@@ -1257,47 +1258,49 @@ window.addEventListener("load", function () {
 
                 try {
 
-                    let targetTable = null;
-
-                    // ✅ نبحث عن جدول "آخر القراءات المسجلة"
-                    document.querySelectorAll("div").forEach(div => {
-                        if (div.innerText.includes("آخر القراءات المسجلة")) {
-                            targetTable = div.querySelector("table");
-                        }
-                    });
-
-                    if (!targetTable) {
-                        alert("❌ لم يتم العثور على جدول القراءات");
-                        return;
-                    }
-
-                    const rows = targetTable.querySelectorAll("tbody tr");
+                    // ✅ نجيب جميع الصفوف المعروضة في الصفحة
+                    const rows = document.querySelectorAll("tr");
 
                     if (rows.length === 0) {
-                        alert("❌ لا يوجد بيانات داخل الجدول");
+                        alert("❌ لا يوجد صفوف في الصفحة");
                         return;
                     }
 
-                    // ✅ آخر صف فقط
-                    const lastRow = rows[rows.length - 1];
-                    const c = lastRow.querySelectorAll("td");
+                    // ✅ ناخد آخر صف فعلي
+                    let lastRow = rows[rows.length - 1];
+                    let cells = lastRow.querySelectorAll("td");
+
+                    // ✅ نبحث عن صف فيه بيانات حقيقية (أكثر من 5 أعمدة)
+                    for (let i = rows.length - 1; i >= 0; i--) {
+                        let testCells = rows[i].querySelectorAll("td");
+                        if (testCells.length >= 8) {
+                            lastRow = rows[i];
+                            cells = testCells;
+                            break;
+                        }
+                    }
+
+                    if (cells.length < 8) {
+                        alert("❌ لم يتم العثور على صف بيانات صحيح");
+                        return;
+                    }
 
                     const payload = {
-                        date: c[0]?.innerText.trim() || "",
-                        code: c[1]?.innerText.trim() || "",
-                        name: c[2]?.innerText.trim() || "",
-                        project: c[3]?.innerText.trim() || "",
-                        status: c[4]?.innerText.trim() || "",
-                        prev: c[5]?.innerText.trim() || 0,
-                        current: c[6]?.innerText.trim() || 0,
-                        net: c[7]?.innerText.trim() || 0,
-                        operator: c[8]?.innerText.trim() || "",
+                        date: cells[0]?.innerText.trim(),
+                        code: cells[1]?.innerText.trim(),
+                        name: cells[2]?.innerText.trim(),
+                        project: cells[3]?.innerText.trim(),
+                        status: cells[4]?.innerText.trim(),
+                        prev: cells[5]?.innerText.trim(),
+                        current: cells[6]?.innerText.trim(),
+                        net: cells[7]?.innerText.trim(),
+                        operator: cells[8]?.innerText.trim(),
                         notes: "",
                         transferType: "",
                         transferTo: ""
                     };
 
-                    console.log("📤 إرسال:", payload);
+                    console.log("📤 البيانات:", payload);
 
                     fetch(API, {
                         method: "POST",
@@ -1307,7 +1310,7 @@ window.addEventListener("load", function () {
                         body: JSON.stringify(payload)
                     });
 
-                    alert("✅ تم الإرسال بنجاح إلى Google Sheets");
+                    alert("✅ تم إرسال البيانات بنجاح");
 
                 } catch (err) {
                     console.error(err);
@@ -1323,6 +1326,7 @@ window.addEventListener("load", function () {
 });
 
 </script>
+
 
 </script>
 ``
