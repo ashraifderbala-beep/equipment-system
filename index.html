@@ -1243,15 +1243,13 @@ function showToast(msg, isError = false) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 </script>
-  <script>
+<script>
 
 window.addEventListener("load", function () {
 
-    const API = "https://script.google.com/macros/s/AKfycbz9-lsqZf7F9NZSryJ_2xBRK86eLZqkO14Y-aUD5EoIHS3cMLcyDuwWiG8RmMxqYH5N/exec";
+    const API = "https://script.google.com/macros/s/AKfycbxcRLY1RabAk8uH7ueHoij8CYVEcKwU0n_1cQ3JXTj0IWOtsrhXi1QMRewYrAmscDa0/exec";
 
-    const buttons = document.querySelectorAll("button");
-
-    buttons.forEach(btn => {
+    document.querySelectorAll("button").forEach(btn => {
 
         if (btn.innerText.includes("حفظ")) {
 
@@ -1259,9 +1257,8 @@ window.addEventListener("load", function () {
 
                 try {
 
-                    // ✅ نحدد جدول "آخر القراءات"
+                    // ✅ تحديد جدول القراءات الصحيح
                     const tables = document.querySelectorAll("table");
-
                     let targetTable = null;
 
                     tables.forEach(t => {
@@ -1276,47 +1273,49 @@ window.addEventListener("load", function () {
                         return;
                     }
 
+                    // ✅ أخذ آخر صف
                     const rows = targetTable.querySelectorAll("tbody tr");
 
                     if (rows.length === 0) {
-                        alert("❌ لا يوجد بيانات");
+                        alert("❌ لا يوجد بيانات داخل الجدول");
                         return;
                     }
 
-                    // ✅ اخر صف (اخر قراءة)
                     const lastRow = rows[rows.length - 1];
-                    const cells = lastRow.querySelectorAll("td");
+                    const c = lastRow.querySelectorAll("td");
 
-                    // ✅ بناء البيانات
+                    // ✅ تجهيز البيانات للإرسال
                     const payload = {
-                        date: cells[0]?.innerText.trim() || "",
-                        code: cells[1]?.innerText.trim() || "",
-                        name: cells[2]?.innerText.trim() || "",
-                        project: cells[3]?.innerText.trim() || "",
-                        status: cells[4]?.innerText.trim() || "",
-                        prev: cells[5]?.innerText.trim() || 0,
-                        current: cells[6]?.innerText.trim() || 0,
-                        net: cells[7]?.innerText.trim() || 0,
-                        operator: cells[8]?.innerText.trim() || "",
-                        notes: cells[9]?.innerText.trim() || "",
-
-                        // الأعمدة الإضافية
+                        date: c[0]?.innerText.trim() || "",
+                        code: c[1]?.innerText.trim() || "",
+                        name: c[2]?.innerText.trim() || "",
+                        project: c[3]?.innerText.trim() || "",
+                        status: c[4]?.innerText.trim() || "",
+                        prev: c[5]?.innerText.trim() || 0,
+                        current: c[6]?.innerText.trim() || 0,
+                        net: c[7]?.innerText.trim() || 0,
+                        operator: c[8]?.innerText.trim() || "",
+                        notes: c[9]?.innerText.trim() || "",
                         transferType: "",
                         transferTo: ""
                     };
 
-                    console.log("📤 إرسال:", payload);
+                    console.log("📤 Sending:", payload);
 
+                    // ✅ إرسال البيانات (مهم جدًا headers)
                     fetch(API, {
                         method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
                         body: JSON.stringify(payload)
                     });
 
-                    alert("✅ تم إرسال البيانات إلى النظام الرئيسي");
+                    alert("✅ تم إرسال البيانات إلى Google Sheets");
 
                 } catch (err) {
                     console.error(err);
-                    alert("❌ حصل خطأ في القراءة");
+                    alert("❌ خطأ في قراءة البيانات");
                 }
 
             });
@@ -1327,6 +1326,8 @@ window.addEventListener("load", function () {
 
 });
 
+</script>
+``
 </script>
 </body>
 </html>
