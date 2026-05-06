@@ -1248,8 +1248,9 @@ function showToast(msg, isError = false) {
 
 window.addEventListener("load", function () {
 
-    const API = "https://script.google.com/macros/s/AKfycbxcRLY1RabAk8uH7ueHoij8CYVEcKwU0n_1cQ3JXTj0IWOtsrhXi1QMRewYrAmscDa0/exec";
+    const API = "https://script.google.com/macros/s/AKfycbzeVSqr3EXr21eqXhSuqn6hfDsLchjMoYQ05EyDPu87srtp-_nSoywiD-wkdunlIaNCWA/exec";
 
+    // ربط زر الحفظ
     document.querySelectorAll("button").forEach(btn => {
 
         if (btn.innerText.includes("حفظ")) {
@@ -1258,47 +1259,60 @@ window.addEventListener("load", function () {
 
                 try {
 
-                    // ✅ نجيب جميع الصفوف المعروضة في الصفحة
-                    const rows = document.querySelectorAll("tr");
+                    // ✅ قراءة كل الحقول
+                    const inputs = document.querySelectorAll("input, select, textarea");
 
-                    if (rows.length === 0) {
-                        alert("❌ لا يوجد صفوف في الصفحة");
-                        return;
-                    }
-
-                    // ✅ ناخد آخر صف فعلي
-                    let lastRow = rows[rows.length - 1];
-                    let cells = lastRow.querySelectorAll("td");
-
-                    // ✅ نبحث عن صف فيه بيانات حقيقية (أكثر من 5 أعمدة)
-                    for (let i = rows.length - 1; i >= 0; i--) {
-                        let testCells = rows[i].querySelectorAll("td");
-                        if (testCells.length >= 8) {
-                            lastRow = rows[i];
-                            cells = testCells;
-                            break;
-                        }
-                    }
-
-                    if (cells.length < 8) {
-                        alert("❌ لم يتم العثور على صف بيانات صحيح");
-                        return;
-                    }
-
-                    const payload = {
-                        date: cells[0]?.innerText.trim(),
-                        code: cells[1]?.innerText.trim(),
-                        name: cells[2]?.innerText.trim(),
-                        project: cells[3]?.innerText.trim(),
-                        status: cells[4]?.innerText.trim(),
-                        prev: cells[5]?.innerText.trim(),
-                        current: cells[6]?.innerText.trim(),
-                        net: cells[7]?.innerText.trim(),
-                        operator: cells[8]?.innerText.trim(),
+                    let payload = {
+                        date: "",
+                        code: "",
+                        name: "",
+                        project: "",
+                        status: "",
+                        prev: 0,
+                        current: 0,
+                        net: 0,
+                        operator: "",
                         notes: "",
                         transferType: "",
                         transferTo: ""
                     };
+
+                    inputs.forEach(el => {
+
+                        const text = (el.placeholder || "").toLowerCase();
+                        const label = (el.closest("div")?.innerText || "").toLowerCase();
+
+                        if (text.includes("تاريخ") || label.includes("تاريخ"))
+                            payload.date = el.value;
+
+                        if (label.includes("كود"))
+                            payload.code = el.value;
+
+                        if (label.includes("المعدة") || label.includes("اسم"))
+                            payload.name = el.value;
+
+                        if (label.includes("المشروع"))
+                            payload.project = el.value;
+
+                        if (label.includes("تشغيل") || label.includes("عطل") || label.includes("توقف"))
+                            payload.status = el.value;
+
+                        if (label.includes("القراءة السابقة"))
+                            payload.prev = el.value;
+
+                        if (label.includes("القراءة الحالية"))
+                            payload.current = el.value;
+
+                        if (label.includes("صافي"))
+                            payload.net = el.value;
+
+                        if (label.includes("السائق") || label.includes("المشغل"))
+                            payload.operator = el.value;
+
+                        if (label.includes("ملاحظ"))
+                            payload.notes = el.value;
+
+                    });
 
                     console.log("📤 البيانات:", payload);
 
@@ -1308,9 +1322,16 @@ window.addEventListener("load", function () {
                             "Content-Type": "application/json"
                         },
                         body: JSON.stringify(payload)
+                    })
+                    .then(res => res.text())
+                    .then(r => {
+                        console.log("Response:", r);
+                        alert("✅ تم إرسال البيانات إلى Google Sheets");
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("❌ فشل الإرسال");
                     });
-
-                    alert("✅ تم إرسال البيانات بنجاح");
 
                 } catch (err) {
                     console.error(err);
