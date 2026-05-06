@@ -1258,63 +1258,50 @@ window.addEventListener("load", function () {
 
                 try {
 
-                    // ✅ قراءة القيم من الحقول
-                    let date = document.querySelector("input[type='date']")?.value;
-
                     let current = document.querySelector("input[placeholder*='الحالية']")?.value;
-                    let prev = document.querySelector("input[placeholder*='السابقة']")?.value;
 
-                    let project = document.querySelectorAll("select")[0]?.value;
-                    let status = document.querySelectorAll("select")[1]?.value;
-
-                    let operator = document.querySelector("input[placeholder*='سائق']")?.value;
-                    let notes = document.querySelector("textarea")?.value;
-
-                    // ✅ منع الإرسال لو مفيش قراءة
-                    if (!current || current == "") {
+                    if (!current) {
                         alert("❌ أدخل القراءة الحالية أولًا");
                         return;
                     }
 
-                    // ✅ تجهيز البيانات
-                    let payload = {
-                        date: date || "",
+                    // ✅ إنشاء فورم
+                    const form = document.createElement("form");
+                    form.method = "POST";
+                    form.action = API;
+                    form.target = "hidden_iframe";
+
+                    // ✅ البيانات
+                    const data = {
+                        date: document.querySelector("input[type='date']")?.value || "",
+                        project: document.querySelectorAll("select")[0]?.value || "",
+                        status: document.querySelectorAll("select")[1]?.value || "",
+                        prev: document.querySelector("input[placeholder*='السابقة']")?.value || 0,
+                        current: current,
+                        net: 0,
+                        operator: document.querySelector("input[placeholder*='سائق']")?.value || "",
+                        notes: document.querySelector("textarea")?.value || "",
                         code: "AUTO",
-                        name: "AUTO",
-                        project: project || "",
-                        status: status || "",
-                        prev: prev || 0,
-                        current: current || 0,
-                        net: (parseFloat(current || 0) - parseFloat(prev || 0)) || 0,
-                        operator: operator || "",
-                        notes: notes || "",
-                        transferType: "",
-                        transferTo: ""
+                        name: "AUTO"
                     };
 
-                    console.log("📤 إرسال:", payload);
+                    // ✅ إضافة البيانات للفورم
+                    for (let key in data) {
+                        let input = document.createElement("input");
+                        input.type = "hidden";
+                        input.name = key;
+                        input.value = data[key];
+                        form.appendChild(input);
+                    }
 
-                    // ✅ الإرسال الحقيقي
-                    fetch(API, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify(payload)
-                    })
-                    .then(res => res.text())
-                    .then(r => {
-                        console.log("✅ Response:", r);
-                        alert("✅ تم الإرسال ووصل إلى Google Sheets");
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        alert("❌ فشل الإرسال");
-                    });
+                    document.body.appendChild(form);
+                    form.submit();
+
+                    alert("✅ تم الإرسال إلى Google Sheets");
 
                 } catch (err) {
                     console.error(err);
-                    alert("❌ خطأ في الكود");
+                    alert("❌ خطأ في الإرسال");
                 }
 
             });
@@ -1327,6 +1314,7 @@ window.addEventListener("load", function () {
 
 </script>
 
+<iframe name="hidden_iframe" style="display:none;"></iframe>
+
 </body>
 </html>
-
