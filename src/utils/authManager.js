@@ -1,262 +1,269 @@
 /**
- * نظام إدارة المصادقة والصلاحيات (Authentication & Authorization)
- * Role-Based Access Control (RBAC)
- * 
- * أنواع المستخدمين:
- * - Admin (مدير النظام): صلاحيات كاملة
- * - Technician (فني/مشرف مشروع): صلاحيات محدودة لمشروعه فقط
- * - Viewer (عارض): قراءة فقط
+ * مدير المصادقة والصلاحيات
+ * نظام Role-Based Access Control (RBAC)
  */
 
-// قائمة المستخدمين الافتراضية
-const defaultUsers = [
-  {
-    userId: 'ADM_001',
-    username: 'admin',
-    password: 'siac_admin_2026',  // في الواقع يجب تشفيرها بـ bcrypt
-    fullName: 'مدير النظام الرئيسي',
-    email: 'admin@siac.com',
-    role: 'Admin',
-    department: 'إدارة المعدات والصيانة',
-    assignedProjects: null,  // Admin يرى جميع المشاريع
+const DB_KEY = 'siac_users'
+const CURRENT_USER_KEY = 'siac_current_user'
+const CURRENT_SESSION_KEY = 'siac_session'
+
+// أدوار المستخدمين والصلاحيات
+export const ROLES = {
+  ADMIN: {
+    id: 'admin',
+    name: 'مدير النظام',
     permissions: [
-      'read_equipment',
-      'create_equipment',
-      'update_equipment',
-      'delete_equipment',
-      'upload_excel',
-      'manage_users',
-      'view_reports',
-      'manage_backup',
-      'view_all_projects'
-    ],
-    isActive: true,
-    createdAt: '2026-01-01'
+      'read:equipment',
+      'write:equipment',
+      'edit:equipment',
+      'delete:equipment',
+      'import:excel',
+      'read:reports',
+      'write:reports',
+      'manage:users',
+      'backup:data',
+      'restore:data',
+      'settings:system'
+    ]
   },
-  {
-    userId: 'TECH_001',
-    username: 'technician_prj001',
-    password: 'tech_2026',
-    fullName: 'محمد علي - فني مشروع',
-    email: 'tech1@siac.com',
-    role: 'Technician',
-    department: 'الموقع الفني - المشروع الأول',
-    assignedProjects: ['PRJ_001'],  // مسؤول عن مشروع واحد فقط
+  TECHNICIAN: {
+    id: 'technician',
+    name: 'فني / مشرف المشروع',
     permissions: [
-      'read_equipment',
-      'log_daily_hours',
-      'report_breakdown',
-      'view_own_project_reports'
-    ],
-    isActive: true,
-    createdAt: '2026-02-15'
-  },
-  {
-    userId: 'TECH_002',
-    username: 'technician_prj002',
-    password: 'tech_2026',
-    fullName: 'أحمد خالد - فني مشروع',
-    email: 'tech2@siac.com',
-    role: 'Technician',
-    department: 'الموقع الفني - المشروع الثاني',
-    assignedProjects: ['PRJ_002', 'PRJ_003'],  // قد يكون مسؤولاً عن عدة مشاريع
-    permissions: [
-      'read_equipment',
-      'log_daily_hours',
-      'report_breakdown',
-      'view_own_project_reports'
-    ],
-    isActive: true,
-    createdAt: '2026-02-15'
+      'read:equipment',
+      'write:daily_logs',
+      'read:daily_logs',
+      'write:breakdown_reports',
+      'read:breakdown_reports',
+      'read:maintenance',
+      'write:maintenance_logs'
+    ]
   }
-]
+}
 
-/**
- * فئة إدارة المصادقة
- */
 export class AuthManager {
-  constructor() {
-    this.currentUser = this.loadFromStorage()
-    this.users = this.loadUsersFromStorage() || defaultUsers
+  /**
+   * تسجيل مستخدم جديد
+   */
+  static registerUser(userData) {
+    try {
+      if (!userData.username || !userData.password || !userData.email) {
+        return { success: false, message: 'جميع الحقول مطلوبة' }
+      }
+
+      // التحقق من عدم وجود اسم مستخدم مكرر
+      const users = this.getAllUsers()
+      if (users.some(u => u.username === userData.username)) {
+        return { success: false, message: 'اسم المستخدم موجود بالفعل' }
+      }
+
+      const newUser = {
+        id: Date.now().toString(),
+        username: userData.username,
+        email: userData.email,
+        password: this.hashPassword(userData.password),
+        role: userData.role || 'technician',
+        projectId: userData.projectId || null,
+        createdAt: new Date().toISOString(),
+        isActive: true
+      }
+
+      users.push(newUser)
+      localStorage.setItem(DB_KEY, JSON.stringify(users))
+
+      return { success: true, message: 'تم إنشاء المستخدم بنجاح', user: { ...newUser, password: undefined } }
+    } catch (error) {
+      console.error('خطأ في تسجيل المستخدم:', error)
+      return { success: false, message: error.message }
+    }
   }
 
   /**
    * تسجيل الدخول
-   * @param {string} username - اسم المستخدم
-   * @param {string} password - كلمة المرور
-   * @returns {Object} - بيانات المستخدم أو null
    */
-  login(username, password) {
-    const user = this.users.find(
-      u => u.username === username && u.password === password && u.isActive
-    )
+  static login(username, password) {
+    try {
+      const users = this.getAllUsers()
+      const user = users.find(u => u.username === username && u.isActive)
 
-    if (user) {
-      this.currentUser = { ...user }
-      delete this.currentUser.password  // لا نخزن كلمة المرور
-      this.saveToStorage(this.currentUser)
-      return this.currentUser
+      if (!user) {
+        return { success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
+      }
+
+      if (!this.verifyPassword(password, user.password)) {
+        return { success: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' }
+      }
+
+      // إنشاء جلسة
+      const session = {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        projectId: user.projectId,
+        loginTime: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 ساعة
+      }
+
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({ ...user, password: undefined }))
+      localStorage.setItem(CURRENT_SESSION_KEY, JSON.stringify(session))
+
+      return { success: true, message: 'تم تسجيل الدخول بنجاح', user: { ...user, password: undefined } }
+    } catch (error) {
+      console.error('خطأ في تسجيل الدخول:', error)
+      return { success: false, message: error.message }
     }
-
-    return null
   }
 
   /**
    * تسجيل الخروج
    */
-  logout() {
-    this.currentUser = null
-    localStorage.removeItem('currentUser')
-  }
-
-  /**
-   * التحقق من تسجيل الدخول
-   */
-  isLoggedIn() {
-    return this.currentUser !== null
-  }
-
-  /**
-   * الحصول على بيانات المستخدم الحالي
-   */
-  getCurrentUser() {
-    return this.currentUser
-  }
-
-  /**
-   * التحقق من صلاحية معينة
-   * @param {string} permission - اسم الصلاحية
-   * @returns {boolean}
-   */
-  hasPermission(permission) {
-    if (!this.currentUser) return false
-    return this.currentUser.permissions.includes(permission)
-  }
-
-  /**
-   * التحقق من أن المستخدم هو Admin
-   */
-  isAdmin() {
-    return this.currentUser?.role === 'Admin'
-  }
-
-  /**
-   * التحقق من أن المستخدم هو Technician
-   */
-  isTechnician() {
-    return this.currentUser?.role === 'Technician'
-  }
-
-  /**
-   * التحقق من إمكانية الوصول لمشروع معين
-   * @param {string} projectId - معرف المشروع
-   */
-  canAccessProject(projectId) {
-    if (this.isAdmin()) return true  // Admin يرى كل المشاريع
-    return this.currentUser?.assignedProjects?.includes(projectId) || false
-  }
-
-  /**
-   * الحصول على قائمة المشاريع المتاح للمستخدم
-   */
-  getAccessibleProjects() {
-    if (this.isAdmin()) return null  // null يعني جميع المشاريع
-    return this.currentUser?.assignedProjects || []
-  }
-
-  /**
-   * حفظ المستخدم الحالي في localStorage
-   */
-  saveToStorage(user) {
-    localStorage.setItem('currentUser', JSON.stringify(user))
-  }
-
-  /**
-   * تحميل المستخدم من localStorage
-   */
-  loadFromStorage() {
-    const stored = localStorage.getItem('currentUser')
-    return stored ? JSON.parse(stored) : null
-  }
-
-  /**
-   * حفظ قائمة المستخدمين
-   */
-  saveUsersToStorage(users) {
-    localStorage.setItem('users', JSON.stringify(users))
-    this.users = users
-  }
-
-  /**
-   * تحميل قائمة المستخدمين
-   */
-  loadUsersFromStorage() {
-    const stored = localStorage.getItem('users')
-    return stored ? JSON.parse(stored) : null
-  }
-
-  /**
-   * إضافة مستخدم جديد (فقط Admin)
-   */
-  addUser(newUser) {
-    if (!this.isAdmin()) {
-      throw new Error('فقط مدير النظام يمكنه إضافة مستخدمين جدد')
+  static logout() {
+    try {
+      localStorage.removeItem(CURRENT_USER_KEY)
+      localStorage.removeItem(CURRENT_SESSION_KEY)
+      return { success: true, message: 'تم تسجيل الخروج بنجاح' }
+    } catch (error) {
+      console.error('خطأ في تسجيل الخروج:', error)
+      return { success: false, message: error.message }
     }
-
-    // التحقق من عدم وجود المستخدم مسبقاً
-    if (this.users.find(u => u.username === newUser.username)) {
-      throw new Error('اسم المستخدم موجود بالفعل')
-    }
-
-    const user = {
-      userId: `USER_${Date.now()}`,
-      ...newUser,
-      createdAt: new Date().toISOString()
-    }
-
-    this.users.push(user)
-    this.saveUsersToStorage(this.users)
-    return user
   }
 
   /**
-   * تحديث بيانات مستخدم (فقط Admin)
+   * الحصول على المستخدم الحالي
    */
-  updateUser(userId, updates) {
-    if (!this.isAdmin()) {
-      throw new Error('فقط مدير النظام يمكنه تحديث بيانات المستخدمين')
+  static getCurrentUser() {
+    try {
+      const user = localStorage.getItem(CURRENT_USER_KEY)
+      return user ? JSON.parse(user) : null
+    } catch (error) {
+      console.error('خطأ في استرجاع المستخدم الحالي:', error)
+      return null
     }
-
-    const user = this.users.find(u => u.userId === userId)
-    if (!user) throw new Error('المستخدم غير موجود')
-
-    Object.assign(user, updates)
-    this.saveUsersToStorage(this.users)
-    return user
   }
 
   /**
-   * حذف مستخدم (فقط Admin)
+   * التحقق من صحة الجلسة
    */
-  deleteUser(userId) {
-    if (!this.isAdmin()) {
-      throw new Error('فقط مدير النظام يمكنه حذف المستخدمين')
-    }
+  static isSessionValid() {
+    try {
+      const session = localStorage.getItem(CURRENT_SESSION_KEY)
+      if (!session) return false
 
-    this.users = this.users.filter(u => u.userId !== userId)
-    this.saveUsersToStorage(this.users)
+      const sessionData = JSON.parse(session)
+      const expiresAt = new Date(sessionData.expiresAt)
+      const now = new Date()
+
+      return now < expiresAt
+    } catch (error) {
+      console.error('خطأ في التحقق من الجلسة:', error)
+      return false
+    }
   }
 
   /**
-   * الحصول على قائمة جميع المستخدمين (فقط Admin)
+   * التحقق من وجود صلاحية محددة
    */
-  getAllUsers() {
-    if (!this.isAdmin()) {
-      throw new Error('فقط مدير النظام يمكنه عرض قائمة المستخدمين')
+  static hasPermission(permission) {
+    const currentUser = this.getCurrentUser()
+    if (!currentUser) return false
+
+    const role = ROLES[currentUser.role]
+    return role && role.permissions.includes(permission)
+  }
+
+  /**
+   * التحقق من وجود دور محدد
+   */
+  static hasRole(role) {
+    const currentUser = this.getCurrentUser()
+    return currentUser && currentUser.role === role
+  }
+
+  /**
+   * الحصول على جميع المستخدمين (للمسؤول فقط)
+   */
+  static getAllUsers() {
+    try {
+      if (!this.hasPermission('manage:users')) {
+        return []
+      }
+      const users = localStorage.getItem(DB_KEY)
+      return users ? JSON.parse(users) : this.initializeDefaultUsers()
+    } catch (error) {
+      console.error('خطأ في استرجاع المستخدمين:', error)
+      return []
     }
-    return this.users.map(u => ({ ...u, password: undefined }))
+  }
+
+  /**
+   * تهيئة المستخدمين الافتراضيين
+   */
+  static initializeDefaultUsers() {
+    const defaultUsers = [
+      {
+        id: '1',
+        username: 'admin',
+        email: 'admin@siac.com',
+        password: this.hashPassword('admin123'),
+        role: 'admin',
+        projectId: null,
+        createdAt: new Date().toISOString(),
+        isActive: true
+      },
+      {
+        id: '2',
+        username: 'technician1',
+        email: 'tech1@siac.com',
+        password: this.hashPassword('tech123'),
+        role: 'technician',
+        projectId: 'PRJ_001',
+        createdAt: new Date().toISOString(),
+        isActive: true
+      }
+    ]
+
+    localStorage.setItem(DB_KEY, JSON.stringify(defaultUsers))
+    return defaultUsers
+  }
+
+  /**
+   * تشفير كلمة المرور (تشفير بسيط - يجب استخدام bcrypt في الإنتاج)
+   */
+  static hashPassword(password) {
+    // تنبيه: هذا تشفير بسيط للاختبار فقط
+    // في الإنتاج، استخدم bcrypt أو argon2
+    return btoa(password)
+  }
+
+  /**
+   * التحقق من كلمة المرور
+   */
+  static verifyPassword(password, hash) {
+    return btoa(password) === hash
+  }
+
+  /**
+   * تفعيل أو تعطيل مستخدم
+   */
+  static toggleUserStatus(userId, isActive) {
+    try {
+      if (!this.hasPermission('manage:users')) {
+        return { success: false, message: 'لا توجد صلاحية' }
+      }
+
+      const users = this.getAllUsers()
+      const user = users.find(u => u.id === userId)
+      if (!user) {
+        return { success: false, message: 'المستخدم غير موجود' }
+      }
+
+      user.isActive = isActive
+      localStorage.setItem(DB_KEY, JSON.stringify(users))
+
+      return { success: true, message: `تم ${isActive ? 'تفعيل' : 'تعطيل'} المستخدم بنجاح` }
+    } catch (error) {
+      console.error('خطأ في تغيير حالة المستخدم:', error)
+      return { success: false, message: error.message }
+    }
   }
 }
-
-// تصدير نسخة واحدة (Singleton)
-export const authManager = new AuthManager()
